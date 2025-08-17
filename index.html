@@ -1,195 +1,279 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat Professores</title>
-  <style>
+<meta charset="UTF-8">
+<title>Sistema de Agendamento</title>
+<style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      height: 100vh;
+        font-family: Arial, sans-serif;
+        margin: 0; padding: 0;
+        background: #f4f4f4;
     }
-    /* Telas */
-    #inicio, #login, #cadastro, #main { display: none; }
-    #inicio.active, #login.active, #cadastro.active, #main.active { display: flex; }
-    #inicio, #login, #cadastro {
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-      height: 100vh;
+    header {
+        background: #0066cc;
+        color: white;
+        padding: 15px;
+        text-align: center;
     }
-    input, button { margin: 5px; padding: 8px; }
-
-    /* Layout do chat */
-    #main { flex-direction: row; width: 100%; height: 100%; }
-    #chatList {
-      width: 250px;
-      border-right: 1px solid #ccc;
-      padding: 10px;
-      background: #f8f8f8;
-      overflow-y: auto;
+    main {
+        max-width: 800px;
+        margin: 20px auto;
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
     }
-    #chatList h3 { margin-top: 0; }
-    .chatUser {
-      padding: 10px;
-      cursor: pointer;
-      border-radius: 5px;
+    label { display: block; margin-top: 10px; font-weight: bold; }
+    input, select, button {
+        padding: 8px;
+        margin-top: 5px;
+        width: 100%;
+        box-sizing: border-box;
     }
-    .chatUser:hover { background: #ddd; }
-    #chatWindow {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
+    button {
+        background: #0066cc;
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-top: 15px;
     }
-    #messages {
-      flex: 1;
-      padding: 10px;
-      overflow-y: auto;
-      border-bottom: 1px solid #ccc;
+    button:hover { background: #004c99; }
+    .horario {
+        padding: 5px;
+        border-bottom: 1px solid #ddd;
     }
-    .msg {
-      margin: 5px 0;
-      padding: 8px;
-      border-radius: 5px;
-      max-width: 70%;
+    .ocupado { color: red; }
+    .disponivel { color: green; }
+    /* Chat lateral */
+    #chat {
+        position: fixed;
+        right: -300px;
+        top: 0;
+        width: 300px;
+        height: 100%;
+        background: #fff;
+        border-left: 2px solid #0066cc;
+        transition: right 0.3s;
+        display: flex;
+        flex-direction: column;
     }
-    .mine { background: #d1ffd1; align-self: flex-end; }
-    .theirs { background: #f1f1f1; align-self: flex-start; }
-    #chatInput {
-      display: flex;
-      padding: 10px;
+    #chat header {
+        background: #0066cc;
+        color: white;
+        padding: 10px;
+        text-align: center;
     }
-    #chatInput input { flex: 1; }
-  </style>
+    #chatMessages {
+        flex: 1;
+        padding: 10px;
+        overflow-y: auto;
+    }
+    #chat input {
+        width: calc(100% - 20px);
+        margin: 10px;
+    }
+    #toggleChat {
+        position: fixed;
+        right: 10px;
+        bottom: 10px;
+        background: #0066cc;
+        color: white;
+        padding: 10px;
+        border-radius: 50%;
+        cursor: pointer;
+    }
+</style>
 </head>
 <body>
 
-<!-- Tela inicial -->
-<div id="inicio" class="active">
-  <h1>Bem-vindo ao Chat</h1>
-  <button onclick="showPage('login')">Entrar</button>
-  <button onclick="showPage('cadastro')">Cadastrar</button>
-</div>
+<header><h1>Sistema de Agendamento</h1></header>
 
-<!-- Tela de login -->
-<div id="login">
-  <h2>Login</h2>
-  <input type="text" id="loginNome" placeholder="Digite seu nome">
-  <button onclick="login()">Entrar</button>
-  <button onclick="showPage('inicio')">Voltar</button>
-</div>
+<main id="telaInicial">
+    <h2>Bem-vindo!</h2>
+    <button onclick="mostrarCadastro()">Cadastrar</button>
+    <button onclick="mostrarLogin()">Entrar</button>
+</main>
 
-<!-- Tela de cadastro -->
-<div id="cadastro">
-  <h2>Cadastro</h2>
-  <input type="text" id="cadastroNome" placeholder="Digite seu nome">
-  <button onclick="cadastrar()">Cadastrar</button>
-  <button onclick="showPage('inicio')">Voltar</button>
-</div>
+<main id="telaCadastro" style="display:none;">
+    <h2>Cadastrar Professor</h2>
+    <label>Nome:</label>
+    <input type="text" id="novoNome">
+    <button onclick="cadastrar()">Cadastrar</button>
+    <button onclick="voltarInicio()">Voltar</button>
+</main>
 
-<!-- Área principal -->
-<div id="main">
-  <!-- Lista de usuários -->
-  <div id="chatList">
-    <h3>Professores</h3>
-    <div id="usersList"></div>
-  </div>
+<main id="telaLogin" style="display:none;">
+    <h2>Entrar</h2>
+    <label>Número de Login:</label>
+    <input type="number" id="loginNumero">
+    <button onclick="entrar()">Entrar</button>
+    <button onclick="voltarInicio()">Voltar</button>
+</main>
 
-  <!-- Janela do chat -->
-  <div id="chatWindow">
-    <h3 id="chatWith">Selecione um professor</h3>
-    <div id="messages"></div>
-    <div id="chatInput">
-      <input type="text" id="msgInput" placeholder="Digite uma mensagem..." disabled>
-      <button onclick="sendMessage()" disabled id="sendBtn">Enviar</button>
-    </div>
-  </div>
+<main id="telaAgendamento" style="display:none;">
+    <h2>Agendamento de Salas</h2>
+    <p id="usuarioLogado"></p>
+
+    <label>Nome do Professor:</label>
+    <input type="text" id="professor" readonly>
+
+    <label>Matéria:</label>
+    <input type="text" id="materia">
+
+    <label>Professor de curso técnico?</label>
+    <select id="tecnico">
+        <option value="false">Não</option>
+        <option value="true">Sim</option>
+    </select>
+
+    <label>Sala:</label>
+    <select id="sala"></select>
+
+    <label>Dia:</label>
+    <select id="dia"></select>
+
+    <label>Horário:</label>
+    <select id="horario"></select>
+
+    <button onclick="agendar()">Agendar</button>
+
+    <div class="horarios" id="listaHorarios"></div>
+</main>
+
+<!-- CHAT -->
+<div id="chat">
+    <header>Chat de Professores</header>
+    <div id="chatMessages"></div>
+    <input type="text" id="chatInput" placeholder="Digite uma mensagem..." onkeypress="if(event.key==='Enter') enviarMensagem()">
 </div>
+<div id="toggleChat" onclick="toggleChat()">💬</div>
 
 <script>
-  let professores = JSON.parse(localStorage.getItem("professores")) || [];
-  let mensagens = JSON.parse(localStorage.getItem("mensagens")) || {}; 
-  let usuarioAtual = null;
-  let chatCom = null;
+class Horario {
+    constructor(professor, materia, tecnico) {
+        this.professor = professor;
+        this.materia = materia;
+        this.tecnico = tecnico;
+    }
+    toString() {
+        return `${this.professor} (${this.materia}) ${this.tecnico ? "[Técnico]" : ""}`;
+    }
+}
 
-  function showPage(page) {
-    document.querySelectorAll("#inicio, #login, #cadastro, #main")
-      .forEach(div => div.classList.remove("active"));
-    document.getElementById(page).classList.add("active");
-  }
+const salas = ["Laboratório de Informática","Laboratório de Ciências","Sala de Vídeo","Auditório"];
+const dias = ["Segunda","Terça","Quarta","Quinta","Sexta"];
+const horarios = ["07:00","07:50","08:40","09:30","10:20","11:10","13:00","13:50","14:40","15:30","16:20","17:10","19:00","19:50","20:40","21:30","22:20"];
+const agenda = {};
+const professores = JSON.parse(localStorage.getItem("professores")) || [];
+let usuario = null;
 
-  function cadastrar() {
-    const nome = document.getElementById("cadastroNome").value.trim();
-    if (!nome) return alert("Digite um nome!");
-    if (professores.find(p => p.nome === nome)) return alert("Nome já cadastrado!");
+// Inicializa agenda
+for (let d of dias) {
+    agenda[d] = {};
+    for (let s of salas) {
+        agenda[d][s] = {};
+        for (let h of horarios) {
+            agenda[d][s][h] = null;
+        }
+    }
+}
 
-    professores.push({ nome });
+// ----- Login e Cadastro -----
+function mostrarCadastro() {
+    document.getElementById("telaInicial").style.display="none";
+    document.getElementById("telaCadastro").style.display="block";
+}
+function mostrarLogin() {
+    document.getElementById("telaInicial").style.display="none";
+    document.getElementById("telaLogin").style.display="block";
+}
+function voltarInicio() {
+    document.getElementById("telaCadastro").style.display="none";
+    document.getElementById("telaLogin").style.display="none";
+    document.getElementById("telaInicial").style.display="block";
+}
+function cadastrar() {
+    let nome = document.getElementById("novoNome").value.trim();
+    if (!nome) { alert("Digite o nome!"); return; }
+    let id = professores.length+1;
+    professores.push({id, nome});
     localStorage.setItem("professores", JSON.stringify(professores));
-    alert("Cadastro realizado!");
-    showPage("login");
-  }
+    alert(`Cadastro realizado! Seu número de login é ${id}`);
+    voltarInicio();
+}
+function entrar() {
+    let id = parseInt(document.getElementById("loginNumero").value);
+    let prof = professores.find(p => p.id===id);
+    if (!prof) { alert("Login inválido!"); return; }
+    usuario = prof;
+    document.getElementById("usuarioLogado").textContent = `Logado como: ${usuario.nome} (ID ${usuario.id})`;
+    document.getElementById("professor").value = usuario.nome;
+    document.getElementById("telaLogin").style.display="none";
+    document.getElementById("telaAgendamento").style.display="block";
+    carregarSelects();
+}
 
-  function login() {
-    const nome = document.getElementById("loginNome").value.trim();
-    const prof = professores.find(p => p.nome === nome);
-    if (!prof) return alert("Professor não encontrado. Cadastre-se primeiro.");
-    usuarioAtual = prof;
-    showPage("main");
-    atualizarListaUsuarios();
-  }
+// ----- Agendamento -----
+function carregarSelects() {
+    let salaSelect = document.getElementById("sala");
+    let diaSelect = document.getElementById("dia");
+    let horaSelect = document.getElementById("horario");
+    if (salaSelect.options.length===0) salas.forEach(s => salaSelect.add(new Option(s,s)));
+    if (diaSelect.options.length===0) dias.forEach(d => diaSelect.add(new Option(d,d)));
+    if (horaSelect.options.length===0) horarios.forEach(h => horaSelect.add(new Option(h,h)));
+    salaSelect.addEventListener("change", mostrarHorarios);
+    diaSelect.addEventListener("change", mostrarHorarios);
+    horaSelect.addEventListener("change", mostrarHorarios);
+}
 
-  function atualizarListaUsuarios() {
-    const usersList = document.getElementById("usersList");
-    usersList.innerHTML = "";
-    professores
-      .filter(p => p.nome !== usuarioAtual.nome)
-      .forEach(p => {
-        const div = document.createElement("div");
-        div.className = "chatUser";
-        div.textContent = p.nome;
-        div.onclick = () => abrirChat(p.nome);
-        usersList.appendChild(div);
-      });
-  }
+function mostrarHorarios() {
+    let dia = document.getElementById("dia").value;
+    let sala = document.getElementById("sala").value;
+    let lista = document.getElementById("listaHorarios");
+    lista.innerHTML="";
+    if (!dia||!sala) return;
+    for (let hora of horarios) {
+        let h = agenda[dia][sala][hora];
+        if (h) {
+            let div=document.createElement("div");
+            div.classList.add("horario","ocupado");
+            div.textContent = `${hora} - Agendado por: ${h.toString()}`;
+            lista.appendChild(div);
+        }
+    }
+}
 
-  function abrirChat(nome) {
-    chatCom = nome;
-    document.getElementById("chatWith").textContent = "Chat com " + nome;
-    document.getElementById("msgInput").disabled = false;
-    document.getElementById("sendBtn").disabled = false;
-    carregarMensagens();
-  }
+function agendar() {
+    let materia = document.getElementById("materia").value.trim();
+    let tecnico = document.getElementById("tecnico").value==="true";
+    let sala = document.getElementById("sala").value;
+    let dia = document.getElementById("dia").value;
+    let hora = document.getElementById("horario").value;
+    if (!materia||!sala||!dia||!hora) { alert("Preencha todos os campos!"); return; }
+    let atual = agenda[dia][sala][hora];
+    if (!atual || (!atual.tecnico && tecnico)) {
+        agenda[dia][sala][hora]=new Horario(usuario.nome,materia,tecnico);
+        alert("Agendado com sucesso!");
+        mostrarHorarios();
+    } else {
+        alert("Horário já agendado!");
+    }
+}
 
-  function carregarMensagens() {
-    const chatId = [usuarioAtual.nome, chatCom].sort().join("-");
-    const msgs = mensagens[chatId] || [];
-    const container = document.getElementById("messages");
-    container.innerHTML = "";
-    msgs.forEach(m => {
-      const div = document.createElement("div");
-      div.className = "msg " + (m.de === usuarioAtual.nome ? "mine" : "theirs");
-      div.textContent = m.texto;
-      container.appendChild(div);
-    });
-    container.scrollTop = container.scrollHeight;
-  }
-
-  function sendMessage() {
-    if (!chatCom) return;
-    const texto = document.getElementById("msgInput").value.trim();
-    if (!texto) return;
-    const chatId = [usuarioAtual.nome, chatCom].sort().join("-");
-    if (!mensagens[chatId]) mensagens[chatId] = [];
-    mensagens[chatId].push({ de: usuarioAtual.nome, texto });
-    localStorage.setItem("mensagens", JSON.stringify(mensagens));
-    document.getElementById("msgInput").value = "";
-    carregarMensagens();
-  }
+// ----- Chat -----
+function toggleChat() {
+    let chat=document.getElementById("chat");
+    chat.style.right = (chat.style.right==="0px"?"-300px":"0px");
+}
+function enviarMensagem() {
+    let input=document.getElementById("chatInput");
+    let msg=input.value.trim();
+    if(!msg) return;
+    let div=document.createElement("div");
+    div.textContent=`${usuario.nome}: ${msg}`;
+    document.getElementById("chatMessages").appendChild(div);
+    input.value="";
+}
 </script>
-
 </body>
 </html>
