@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Agendamento de Salas</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #f4f4f4;
+        margin: 0;
+        padding: 0;
+    }
+    header {
+        background: #0066cc;
+        color: white;
+        padding: 15px;
+        text-align: center;
+    }
+    main {
+        max-width: 800px;
+        margin: 20px auto;
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    label {
+        display: block;
+        margin-top: 10px;
+        font-weight: bold;
+    }
+    input, select, button {
+        padding: 8px;
+        margin-top: 5px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    button {
+        background: #0066cc;
+        color: white;
+        border: none;
+        cursor: pointer;
+        margin-top: 15px;
+    }
+    button:hover {
+        background: #004c99;
+    }
+    .horarios {
+        margin-top: 20px;
+    }
+    .horario {
+        padding: 5px;
+        border-bottom: 1px solid #ddd;
+    }
+    .ocupado { color: red; }
+</style>
+</head>
+<body>
+
+<header>
+    <h1>Agendamento de Salas</h1>
+</header>
+
+<main>
+    <label>Nome do Professor:</label>
+    <input type="text" id="professor">
+
+    <label>Matéria:</label>
+    <input type="text" id="materia">
+
+    <label>Professor de curso técnico?</label>
+    <select id="tecnico">
+        <option value="false">Não</option>
+        <option value="true">Sim</option>
+    </select>
+
+    <label>Sala:</label>
+    <select id="sala"></select>
+
+    <label>Dia:</label>
+    <select id="dia"></select>
+
+    <label>Horário (ex: 08:00, 14:30):</label>
+    <input type="time" id="horario">
+
+    <button onclick="agendar()">Agendar</button>
+
+    <div class="horarios" id="listaHorarios"></div>
+</main>
+
+<script>
+class Horario {
+    constructor(professor, materia, tecnico) {
+        this.professor = professor;
+        this.materia = materia;
+        this.tecnico = tecnico;
+    }
+    toString() {
+        return `${this.professor} (${this.materia}) ${this.tecnico ? "[Técnico]" : ""}`;
+    }
+}
+
+const salas = [
+    "Laboratório de Informática",
+    "Laboratório de Ciências",
+    "Sala de Vídeo",
+    "Auditório"
+];
+const dias = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta"];
+const agenda = {};
+
+function inicializarAgenda() {
+    for (let dia of dias) {
+        agenda[dia] = {};
+        for (let sala of salas) {
+            agenda[dia][sala] = {};
+        }
+    }
+}
+
+function carregarSelects() {
+    let salaSelect = document.getElementById("sala");
+    salas.forEach(s => salaSelect.add(new Option(s, s)));
+
+    let diaSelect = document.getElementById("dia");
+    dias.forEach(d => diaSelect.add(new Option(d, d)));
+
+    salaSelect.addEventListener("change", mostrarHorarios);
+    diaSelect.addEventListener("change", mostrarHorarios);
+}
+
+function mostrarHorarios() {
+    let dia = document.getElementById("dia").value;
+    let sala = document.getElementById("sala").value;
+    let lista = document.getElementById("listaHorarios");
+    lista.innerHTML = "";
+    if (!dia || !sala) return;
+
+    let horariosOcupados = Object.keys(agenda[dia][sala]);
+    if (horariosOcupados.length === 0) {
+        lista.innerHTML = "<p>Nenhum horário agendado.</p>";
+        return;
+    }
+
+    for (let hora of horariosOcupados) {
+        let h = agenda[dia][sala][hora];
+        let div = document.createElement("div");
+        div.classList.add("horario", "ocupado");
+        div.textContent = `${hora} - Agendado por: ${h.toString()}`;
+        lista.appendChild(div);
+    }
+}
+
+function agendar() {
+    let professor = document.getElementById("professor").value.trim();
+    let materia = document.getElementById("materia").value.trim();
+    let tecnico = document.getElementById("tecnico").value === "true";
+    let sala = document.getElementById("sala").value;
+    let dia = document.getElementById("dia").value;
+    let hora = document.getElementById("horario").value;
+
+    if (!professor || !materia || !sala || !dia || !hora) {
+        alert("Preencha todos os campos!");
+        return;
+    }
+
+    let atual = agenda[dia][sala][hora];
+    if (!atual) {
+        agenda[dia][sala][hora] = new Horario(professor, materia, tecnico);
+        alert("Agendamento realizado com sucesso!");
+    } else {
+        if (!atual.tecnico && tecnico) {
+            agenda[dia][sala][hora] = new Horario(professor, materia, tecnico);
+            alert("Agendamento realizado com prioridade (técnico)!");
+        } else {
+            alert(`Horário já agendado por: ${atual.toString()}`);
+        }
+    }
+    mostrarHorarios();
+}
+
+// Inicializa
+inicializarAgenda();
+carregarSelects();
+</script>
+</body>
+</html>
