@@ -61,6 +61,9 @@
       background: #0072d4;
       color: white;
       font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
     .messages {
@@ -113,6 +116,18 @@
       border-radius: 5px;
     }
 
+    /* Botão voltar */
+    #logoutBtn {
+      background: #ff4d4d;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+
     /* Tela de login */
     .login-screen {
       display: flex;
@@ -158,6 +173,7 @@
 
   <div id="chatApp" style="display:none;">
     <header>Chat dos Professores</header>
+    <button id="logoutBtn" onclick="logout()">Voltar</button>
     <div class="container">
       <div class="sidebar">
         <h3>Professores</h3>
@@ -197,6 +213,13 @@
 
       document.getElementById("loginScreen").style.display = "none";
       document.getElementById("chatApp").style.display = "block";
+    }
+
+    function logout() {
+      currentUser = null;
+      currentChat = null;
+      document.getElementById("chatApp").style.display = "none";
+      document.getElementById("loginScreen").style.display = "flex";
     }
 
     function loadContacts() {
