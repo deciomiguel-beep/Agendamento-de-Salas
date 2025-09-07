@@ -1,115 +1,125 @@
+<?php
+// ==========================
+// BACKEND PHP
+// ==========================
+$pdo = new PDO("mysql:host=localhost;dbname=sistema_agendamento;charset=utf8", "root", "");
+
+// Criar tabelas se não existirem
+$pdo->exec("
+CREATE TABLE IF NOT EXISTS usuarios (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL UNIQUE,
+    senha VARCHAR(255) NOT NULL,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS agendamentos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    materia VARCHAR(100) NOT NULL,
+    tecnico BOOLEAN DEFAULT FALSE,
+    sala VARCHAR(100) NOT NULL,
+    dia VARCHAR(20) NOT NULL,
+    horario VARCHAR(10) NOT NULL,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+    UNIQUE (sala, dia, horario)
+);
+");
+
+// Requisições AJAX
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['acao'])) {
+    header("Content-Type: application/json");
+
+    // Cadastro
+    if ($_POST['acao'] === 'cadastrar') {
+        $nome = $_POST['nome'];
+        $senha = password_hash($_POST['senha'], PASSWORD_DEFAULT);
+        try {
+            $stmt = $pdo->prepare("INSERT INTO usuarios (nome, senha) VALUES (?, ?)");
+            $stmt->execute([$nome, $senha]);
+            echo json_encode(["ok" => true, "id" => $pdo->lastInsertId()]);
+        } catch (PDOException $e) {
+            echo json_encode(["ok" => false, "erro" => "Nome já cadastrado"]);
+        }
+        exit;
+    }
+
+    // Login
+    if ($_POST['acao'] === 'login') {
+        $id = $_POST['id'];
+        $senha = $_POST['senha'];
+        $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE id=?");
+        $stmt->execute([$id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($user && password_verify($senha, $user['senha'])) {
+            echo json_encode(["ok" => true, "nome" => $user['nome']]);
+        } else {
+            echo json_encode(["ok" => false, "erro" => "Login ou senha inválidos"]);
+        }
+        exit;
+    }
+
+    // Agendamento
+    if ($_POST['acao'] === 'agendar') {
+        $usuario_id = $_POST['usuario_id'];
+        $materia = $_POST['materia'];
+        $tecnico = $_POST['tecnico'] === "true" ? 1 : 0;
+        $sala = $_POST['sala'];
+        $dia = $_POST['dia'];
+        $horario = $_POST['horario'];
+        try {
+            $stmt = $pdo->prepare("INSERT INTO agendamentos (usuario_id, materia, tecnico, sala, dia, horario) 
+                                   VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$usuario_id, $materia, $tecnico, $sala, $dia, $horario]);
+            echo json_encode(["ok" => true]);
+        } catch (PDOException $e) {
+            echo json_encode(["ok" => false, "erro" => "Horário já ocupado"]);
+        }
+        exit;
+    }
+
+    // Listar agendamentos
+    if ($_POST['acao'] === 'listar') {
+        $dia = $_POST['dia'];
+        $sala = $_POST['sala'];
+        $stmt = $pdo->prepare("
+            SELECT a.horario, u.nome, a.materia, a.tecnico 
+            FROM agendamentos a
+            JOIN usuarios u ON u.id=a.usuario_id
+            WHERE a.dia=? AND a.sala=?
+        ");
+        $stmt->execute([$dia, $sala]);
+        $ocupados = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $ocupados[$row['horario']] = $row;
+        }
+        echo json_encode($ocupados);
+        exit;
+    }
+}
+?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Sistema de Agendamento + Chat</title>
+<title>Agendamento de Salas da EEGR</title>
 <style>
-body {
-    font-family: Arial, sans-serif;
-    margin: 0; padding: 0;
-    background: #f4f4f4;
-}
-header {
-    background: #0066cc;
-    color: white;
-    padding: 15px;
-    text-align: center;
-}
-main {
-    max-width: 800px;
-    margin: 20px auto;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.2);
-}
+/* ======= ESTILOS (inalterados + novos para cores) ======= */
+body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+header { background: #0066cc; color: white; padding: 15px; text-align: center; }
+main { max-width: 800px; margin: 20px auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
 label { display: block; margin-top: 10px; font-weight: bold; }
-input, select, button {
-    padding: 8px;
-    margin-top: 5px;
-    width: 100%;
-    box-sizing: border-box;
-}
-button {
-    background: #0066cc;
-    color: white;
-    border: none;
-    cursor: pointer;
-    margin-top: 15px;
-}
+input, select, button { padding: 8px; margin-top: 5px; width: 100%; box-sizing: border-box; }
+button { background: #0066cc; color: white; border: none; cursor: pointer; margin-top: 15px; }
 button:hover { background: #004c99; }
-.horario {
-    padding: 5px;
-    border-bottom: 1px solid #ddd;
-}
-.ocupado { color: red; }
-.disponivel { color: green; }
-/* Chat lateral */
-#chat {
-    position: fixed;
-    right: -350px;
-    top: 0;
-    width: 350px;
-    height: 100%;
-    background: #fff;
-    border-left: 2px solid #0066cc;
-    transition: right 0.3s;
-    display: flex;
-    flex-direction: column;
-}
-#chat header {
-    background: #0066cc;
-    color: white;
-    padding: 10px;
-    text-align: center;
-    font-weight: bold;
-}
-#contacts {
-    max-height: 150px;
-    overflow-y: auto;
-    border-bottom: 1px solid #ddd;
-}
-.contact {
-    padding: 8px;
-    cursor: pointer;
-    border-bottom: 1px solid #f0f0f0;
-}
-.contact:hover {
-    background: #f5f5f5;
-}
-#chatMessages {
-    flex: 1;
-    padding: 10px;
-    overflow-y: auto;
-    background: #fafafa;
-}
-.message {
-    margin-bottom: 10px;
-    padding: 8px;
-    border-radius: 8px;
-    max-width: 70%;
-    word-wrap: break-word;
-}
-.sent { background: #0066cc; color: white; margin-left: auto; }
-.received { background: #e0e0e0; color: black; margin-right: auto; }
-#chat input {
-    width: calc(100% - 20px);
-    margin: 10px;
-    padding: 8px;
-    border-radius: 5px;
-    border: 1px solid #ddd;
-}
-#toggleChat {
-    position: fixed;
-    right: 10px;
-    bottom: 10px;
-    background: #0066cc;
-    color: white;
-    padding: 10px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-size: 18px;
-}
+.horario { padding: 6px; border-bottom: 1px solid #ddd; border-radius: 5px; margin: 3px 0; }
+.ocupado { background: #ffe6e6; color: #cc0000; font-weight: bold; }
+.livre { background: #e6ffe6; color: #006600; }
+.input-com-olhinho { position: relative; width: 100%; }
+.input-com-olhinho input { width: 100%; padding-right: 35px; }
+.input-com-olhinho .toggle-olhinho { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); cursor: pointer; font-size: 18px; color: #666; }
+.input-com-olhinho .toggle-olhinho:hover { color: #000; }
 </style>
 </head>
 <body>
@@ -126,6 +136,16 @@ button:hover { background: #004c99; }
     <h2>Cadastrar Professor</h2>
     <label>Nome:</label>
     <input type="text" id="novoNome">
+    <label>Senha (mínimo 8 caracteres):</label>
+    <div class="input-com-olhinho">
+        <input type="password" id="novaSenha">
+        <span class="toggle-olhinho" onclick="toggleSenha('novaSenha', this)">&#128065;</span>
+    </div>
+    <label>Confirmar Senha:</label>
+    <div class="input-com-olhinho">
+        <input type="password" id="confirmaSenha">
+        <span class="toggle-olhinho" onclick="toggleSenha('confirmaSenha', this)">&#128065;</span>
+    </div>
     <button onclick="cadastrar()">Cadastrar</button>
     <button onclick="voltarInicio()">Voltar</button>
 </main>
@@ -134,6 +154,11 @@ button:hover { background: #004c99; }
     <h2>Entrar</h2>
     <label>Número de Login:</label>
     <input type="number" id="loginNumero">
+    <label>Senha:</label>
+    <div class="input-com-olhinho">
+        <input type="password" id="loginSenha">
+        <span class="toggle-olhinho" onclick="toggleSenha('loginSenha', this)">&#128065;</span>
+    </div>
     <button onclick="entrar()">Entrar</button>
     <button onclick="voltarInicio()">Voltar</button>
 </main>
@@ -141,202 +166,120 @@ button:hover { background: #004c99; }
 <main id="telaAgendamento" style="display:none;">
     <h2>Agendamento de Salas</h2>
     <p id="usuarioLogado"></p>
-
     <label>Nome do Professor:</label>
     <input type="text" id="professor" readonly>
-
     <label>Matéria:</label>
     <input type="text" id="materia">
-
     <label>Professor de curso técnico?</label>
-    <select id="tecnico">
-        <option value="false">Não</option>
-        <option value="true">Sim</option>
-    </select>
-
+    <select id="tecnico"><option value="false">Não</option><option value="true">Sim</option></select>
     <label>Sala:</label>
     <select id="sala"></select>
-
     <label>Dia:</label>
     <select id="dia"></select>
-
     <label>Horário:</label>
     <select id="horario"></select>
-
     <button onclick="agendar()">Agendar</button>
-
+    <h3>Horários da Sala</h3>
     <div class="horarios" id="listaHorarios"></div>
 </main>
 
-<!-- CHAT -->
-<div id="chat">
-    <header>Chat de Professores</header>
-    <div id="contacts"></div>
-    <div id="chatHeader" style="padding:5px 10px; border-bottom:1px solid #ddd;">Selecione um professor</div>
-    <div id="chatMessages"></div>
-    <input type="text" id="chatInput" placeholder="Digite sua mensagem..." onkeypress="if(event.key==='Enter') sendMessage()">
-</div>
-<div id="toggleChat" onclick="toggleChat()">💬</div>
-
 <script>
-// ----------------- AGENDAMENTO -----------------
-class Horario {
-    constructor(professor, materia, tecnico) {
-        this.professor = professor;
-        this.materia = materia;
-        this.tecnico = tecnico;
-    }
-    toString() {
-        return `${this.professor} (${this.materia}) ${this.tecnico ? "[Técnico]" : ""}`;
-    }
-}
+// ==========================
+// JAVASCRIPT FRONTEND
+// ==========================
 const salas = ["Laboratório de Informática","Laboratório de Ciências","Sala de Vídeo","Auditório"];
 const dias = ["Segunda","Terça","Quarta","Quinta","Sexta"];
 const horarios = ["07:00","07:50","08:40","09:30","10:20","11:10","13:00","13:50","14:40","15:30","16:20","17:10","19:00","19:50","20:40","21:30","22:20"];
-const agenda = {};
-const professores = JSON.parse(localStorage.getItem("professores")) || [];
+
 let usuario = null;
-for (let d of dias) {
-    agenda[d] = {};
-    for (let s of salas) {
-        agenda[d][s] = {};
-        for (let h of horarios) {
-            agenda[d][s][h] = null;
-        }
-    }
-}
-// ---- LOGIN / CADASTRO ----
-function mostrarCadastro() {
-    document.getElementById("telaInicial").style.display="none";
-    document.getElementById("telaCadastro").style.display="block";
-}
-function mostrarLogin() {
-    document.getElementById("telaInicial").style.display="none";
-    document.getElementById("telaLogin").style.display="block";
-}
-function voltarInicio() {
-    document.getElementById("telaCadastro").style.display="none";
-    document.getElementById("telaLogin").style.display="none";
-    document.getElementById("telaAgendamento").style.display="none";
-    document.getElementById("telaInicial").style.display="block";
-}
-function cadastrar() {
-    let nome = document.getElementById("novoNome").value.trim();
-    if (!nome) { alert("Digite o nome!"); return; }
-    let id = professores.length+1;
-    professores.push({id, nome});
-    localStorage.setItem("professores", JSON.stringify(professores));
-    alert(`Cadastro realizado! Seu número de login é ${id}`);
-    voltarInicio();
-}
-function entrar() {
-    let id = parseInt(document.getElementById("loginNumero").value);
-    let prof = professores.find(p => p.id===id);
-    if (!prof) { alert("Login inválido!"); return; }
-    usuario = prof;
-    document.getElementById("usuarioLogado").textContent = `Logado como: ${usuario.nome} (ID ${usuario.id})`;
-    document.getElementById("professor").value = usuario.nome;
-    document.getElementById("telaLogin").style.display="none";
-    document.getElementById("telaAgendamento").style.display="block";
-    carregarSelects();
-    loadContacts(); // Atualiza lista de contatos do chat
-}
-// ---- AGENDAMENTO ----
-function carregarSelects() {
-    let salaSelect = document.getElementById("sala");
-    let diaSelect = document.getElementById("dia");
-    let horaSelect = document.getElementById("horario");
-    if (salaSelect.options.length===0) salas.forEach(s => salaSelect.add(new Option(s,s)));
-    if (diaSelect.options.length===0) dias.forEach(d => diaSelect.add(new Option(d,d)));
-    if (horaSelect.options.length===0) horarios.forEach(h => horaSelect.add(new Option(h,h)));
-    salaSelect.addEventListener("change", mostrarHorarios);
-    diaSelect.addEventListener("change", mostrarHorarios);
-    horaSelect.addEventListener("change", mostrarHorarios);
-}
-function mostrarHorarios() {
-    let dia = document.getElementById("dia").value;
-    let sala = document.getElementById("sala").value;
-    let lista = document.getElementById("listaHorarios");
-    lista.innerHTML="";
-    if (!dia||!sala) return;
-    for (let hora of horarios) {
-        let h = agenda[dia][sala][hora];
-        if (h) {
-            let div=document.createElement("div");
-            div.classList.add("horario","ocupado");
-            div.textContent = `${hora} - Agendado por: ${h.toString()}`;
-            lista.appendChild(div);
-        }
-    }
-}
-function agendar() {
-    let materia = document.getElementById("materia").value.trim();
-    let tecnico = document.getElementById("tecnico").value==="true";
-    let sala = document.getElementById("sala").value;
-    let dia = document.getElementById("dia").value;
-    let hora = document.getElementById("horario").value;
-    if (!materia||!sala||!dia||!hora) { alert("Preencha todos os campos!"); return; }
-    let atual = agenda[dia][sala][hora];
-    if (!atual || (!atual.tecnico && tecnico)) {
-        agenda[dia][sala][hora]=new Horario(usuario.nome,materia,tecnico);
-        alert("Agendado com sucesso!");
-        mostrarHorarios();
-    } else {
-        alert("Horário já agendado!");
-    }
+
+// ---- NAVEGAÇÃO ----
+function mostrarCadastro(){ document.getElementById("telaInicial").style.display="none"; document.getElementById("telaCadastro").style.display="block"; }
+function mostrarLogin(){ document.getElementById("telaInicial").style.display="none"; document.getElementById("telaLogin").style.display="block"; }
+function voltarInicio(){ ["telaCadastro","telaLogin","telaAgendamento"].forEach(id=>document.getElementById(id).style.display="none"); document.getElementById("telaInicial").style.display="block"; }
+
+// ---- CADASTRO ----
+function cadastrar(){
+    let nome=document.getElementById("novoNome").value.trim();
+    let senha=document.getElementById("novaSenha").value;
+    let confirma=document.getElementById("confirmaSenha").value;
+    if(!nome||senha.length<8||senha!==confirma){ alert("Verifique os campos!"); return; }
+    fetch("index.php",{method:"POST",body:new URLSearchParams({acao:"cadastrar",nome,senha})})
+    .then(r=>r.json()).then(res=>{
+        if(res.ok){ alert(`Cadastro feito! Seu ID é ${res.id}`); voltarInicio(); }
+        else alert(res.erro);
+    });
 }
 
-// ----------------- CHAT -----------------
-let currentChat = null;
-function toggleChat() {
-    let chat=document.getElementById("chat");
-    chat.style.right = (chat.style.right==="0px"?"-350px":"0px");
-}
-function loadContacts() {
-    let users = professores.filter(p => p.id!==usuario.id);
-    const contactsDiv = document.getElementById("contacts");
-    contactsDiv.innerHTML="";
-    users.forEach(user=>{
-        let div = document.createElement("div");
-        div.className="contact";
-        div.textContent = user.nome;
-        div.onclick = ()=>openChat(user);
-        contactsDiv.appendChild(div);
+// ---- LOGIN ----
+function entrar(){
+    let id=document.getElementById("loginNumero").value;
+    let senha=document.getElementById("loginSenha").value;
+    fetch("index.php",{method:"POST",body:new URLSearchParams({acao:"login",id,senha})})
+    .then(r=>r.json()).then(res=>{
+        if(res.ok){
+            usuario={id,res:res.nome};
+            document.getElementById("usuarioLogado").textContent=`Logado como: ${res.nome} (ID ${id})`;
+            document.getElementById("professor").value=res.nome;
+            document.getElementById("telaLogin").style.display="none";
+            document.getElementById("telaAgendamento").style.display="block";
+            carregarSelects();
+        } else alert(res.erro);
     });
 }
-function chatKey(user1, user2) {
-    return "chat_"+[user1.id,user2.id].sort().join("_");
+
+// ---- AGENDAMENTO ----
+function carregarSelects(){
+    let salaSelect=document.getElementById("sala");
+    let diaSelect=document.getElementById("dia");
+    let horaSelect=document.getElementById("horario");
+    if(salaSelect.options.length===0) salas.forEach(s=>salaSelect.add(new Option(s,s)));
+    if(diaSelect.options.length===0) dias.forEach(d=>diaSelect.add(new Option(d,d)));
+    if(horaSelect.options.length===0) horarios.forEach(h=>horaSelect.add(new Option(h,h)));
+    salaSelect.addEventListener("change",mostrarHorarios);
+    diaSelect.addEventListener("change",mostrarHorarios);
 }
-function openChat(user) {
-    currentChat=user;
-    document.getElementById("chatHeader").textContent = `Conversando com ${user.nome}`;
-    loadMessages();
-}
-function loadMessages() {
-    if(!currentChat) return;
-    const key=chatKey(usuario,currentChat);
-    let msgs = JSON.parse(localStorage.getItem(key)) || [];
-    const msgDiv = document.getElementById("chatMessages");
-    msgDiv.innerHTML="";
-    msgs.forEach(m=>{
-        let div=document.createElement("div");
-        div.className="message "+(m.senderId===usuario.id?"sent":"received");
-        div.textContent=m.text;
-        msgDiv.appendChild(div);
+function agendar(){
+    let materia=document.getElementById("materia").value;
+    let tecnico=document.getElementById("tecnico").value;
+    let sala=document.getElementById("sala").value;
+    let dia=document.getElementById("dia").value;
+    let hora=document.getElementById("horario").value;
+    if(!materia||!sala||!dia||!hora){ alert("Preencha todos os campos!"); return; }
+    fetch("index.php",{method:"POST",body:new URLSearchParams({acao:"agendar",usuario_id:usuario.id,materia,tecnico,sala,dia,horario:hora})})
+    .then(r=>r.json()).then(res=>{
+        if(res.ok){ alert("Agendado com sucesso!"); mostrarHorarios(); }
+        else alert(res.erro);
     });
-    msgDiv.scrollTop=msgDiv.scrollHeight;
 }
-function sendMessage() {
-    if(!currentChat){ alert("Selecione um professor!"); return; }
-    const input=document.getElementById("chatInput");
-    const text=input.value.trim();
-    if(!text) return;
-    const key=chatKey(usuario,currentChat);
-    let msgs = JSON.parse(localStorage.getItem(key)) || [];
-    msgs.push({senderId:usuario.id,text});
-    localStorage.setItem(key,JSON.stringify(msgs));
-    input.value="";
-    loadMessages();
+function mostrarHorarios(){
+    let dia=document.getElementById("dia").value;
+    let sala=document.getElementById("sala").value;
+    let lista=document.getElementById("listaHorarios");
+    lista.innerHTML="";
+    if(!dia||!sala) return;
+    fetch("index.php",{method:"POST",body:new URLSearchParams({acao:"listar",dia,sala})})
+    .then(r=>r.json()).then(res=>{
+        horarios.forEach(h=>{
+            let div=document.createElement("div");
+            div.classList.add("horario");
+            if(res[h]){
+                div.classList.add("ocupado");
+                div.textContent=`${h} - ${res[h].nome} (${res[h].materia}) ${res[h].tecnico==1?"[Técnico]":""}`;
+            } else {
+                div.classList.add("livre");
+                div.textContent=`${h} - Disponível`;
+            }
+            lista.appendChild(div);
+        });
+    });
+}
+
+// ---- SENHA OLHINHO ----
+function toggleSenha(inputId, icon){
+    const input=document.getElementById(inputId);
+    if(input.type==="password"){ input.type="text"; icon.style.color="#0066cc"; }
+    else{ input.type="password"; icon.style.color="#666"; }
 }
 </script>
 </body>
