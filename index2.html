@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <title>Sistema de Agendamento da EEGR</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <style>
+    /* ====== ESTILOS GERAIS ====== */
+    * { box-sizing: border-box; font-family: Arial, sans-serif; }
+    body {
+      margin:0; padding:0; color:#222;
+      background: url("https://87c587b774.cbaul-cdnwnd.com/0aaca04a8a983852ec44f506f7b48d7b/200000007-9a93e9a93f/Design%20sem%20nome%20%281%29.webp?ph=87c587b774.png")
+      no-repeat center center fixed;
+      background-size: cover;
+    }
+
+    /* ====== CABEÇALHO ====== */
+    header {
+      background: yellow; color: #000; padding: 20px;
+      font-size: 35px; font-weight: bold;
+      display: flex; justify-content: center; align-items: center; gap: 20px;
+    }
+    header .logo { height: 120px; }
+    header span { flex: none; }
+
+    /* ====== CONTEÚDO PRINCIPAL ====== */
+    main {
+      max-width: 800px; margin: 20px auto;
+      background: rgba(255,255,255,0.9);
+      padding: 20px; border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    footer { text-align: center; margin: 15px 0; font-size: 14px; color: #333; }
+    .hidden { display:none; }
+
+    /* ====== TEXTOS ====== */
+    h2 { margin-top:0; }
+
+    /* ====== BOTÕES ====== */
+    .btn {
+      display:block; width:100%; padding:12px; margin:8px 0;
+      background:#0066cc; color:#fff; border:none;
+      border-radius:3px; cursor:pointer; font-size:16px; font-weight:500;
+      transition:0.2s;
+    }
+    .btn:hover { background:#0055aa; }
+
+    /* ====== CAMPOS ====== */
+    input, select { width:100%; padding:8px; margin:6px 0; }
+    .cancelar { margin-left:10px; font-size:12px; color:red; cursor:pointer; }
+
+    /* ====== VISUALIZAÇÃO SENHA ====== */
+    .senha-container { position: relative; display: flex; align-items: center; }
+    .senha-container input { width: 100%; padding-right: 40px; }
+    .toggle-senha {
+      position: absolute; right: 10px; cursor: pointer;
+      user-select: none; font-size: 16px; color: #333;
+    }
+
+    /* ====== CALENDÁRIO ====== */
+    .calendar { display:inline-block; border:1px solid #ccc; border-radius:6px; padding:10px; margin:10px 0; background:#fff; }
+    .calendar-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+    .calendar-grid { display:grid; grid-template-columns: repeat(7,1fr); gap:4px; }
+    .calendar-grid div { padding:6px; text-align:center; cursor:pointer; border-radius:4px; }
+    .calendar-grid div.disabled { color:#aaa; cursor:default; }
+    .calendar-grid div.active { background:#0066cc; color:#fff; }
+
+    /* ====== HORÁRIOS ====== */
+    .horarios { display:flex; flex-wrap:wrap; gap:8px; margin-top:15px; }
+    .horario { padding:10px 14px; background:#666; color:white; border-radius:4px; cursor:pointer; }
+    .horario.ocupado { background:#999; cursor:not-allowed; }
+
+    /* ====== SALAS ====== */
+    .salas { margin-top:15px; }
+    .sala { padding:10px; margin:6px 0; border:1px solid #ccc; border-radius:4px; cursor:pointer; background:#fff; }
+    .sala.ocupada { background:#eee; color:#666; cursor:not-allowed; }
+
+    /* ====== LISTA DE AGENDAMENTOS ====== */
+    .listaAgendamentos { list-style: none; padding: 0; }
+    .listaAgendamentos li { padding: 8px; border-bottom: 1px solid #ddd; background:#fff; }
+  </style>
+</head>
+<body>
+
+  <!-- ====== CABEÇALHO ====== -->
+  <header>
+    <img src="https://images.seeklogo.com/logo-png/49/1/escola-estadual-guimaraes-rosa-logo-png_seeklogo-496976.png" alt="Logo esquerda" class="logo">
+    <span>Sistema de Agendamento Escolar</span>
+    <img src="https://images.seeklogo.com/logo-png/49/1/escola-estadual-guimaraes-rosa-logo-png_seeklogo-496976.png" alt="Logo direita" class="logo">
+  </header>
+
+  <!-- ====== TELA INICIAL ====== -->
+  <main id="telaInicial">
+    <h2>Bem-vindo!</h2>
+    <button class="btn" onclick="mostrar('telaCadastro')">Cadastrar</button>
+    <button class="btn" onclick="mostrar('telaLogin')">Entrar</button>
+    <footer>Desenvolvido por @decio_miguel, @_analuizaxzs e @emi.drade</footer>
+  </main>
+
+  <!-- ====== TELA DE CADASTRO ====== -->
+  <main id="telaCadastro" class="hidden">
+    <h2>Cadastrar</h2>
+    <input id="novoNome" placeholder="Nome">
+    <input id="novoEmail" placeholder="Email" type="email">
+
+    <!-- Campo senha com botão 👁 -->
+    <div class="senha-container">
+      <input id="novaSenha" placeholder="Senha" type="password">
+      <span class="toggle-senha" onclick="toggleSenha('novaSenha', this)">👁</span>
+    </div>
+
+    <input id="confirmaSenha" placeholder="Confirmar Senha" type="password">
+    <button class="btn" onclick="iniciarCadastro()">Salvar</button>
+    <button class="btn" onclick="mostrar('telaInicial')">Voltar</button>
+  </main>
+
+  <!-- ====== TELA DE LOGIN ====== -->
+  <main id="telaLogin" class="hidden">
+    <h2>Entrar</h2>
+    <input id="loginNumero" placeholder="ID de Professor">
+
+    <!-- Campo senha com botão 👁 -->
+    <div class="senha-container">
+      <input id="loginSenha" placeholder="Senha" type="password">
+      <span class="toggle-senha" onclick="toggleSenha('loginSenha', this)">👁</span>
+    </div>
+
+    <button class="btn" onclick="entrar()">Login</button>
+    <button class="btn" onclick="mostrar('telaInicial')">Voltar</button>
+  </main>
+
+  <!-- ====== TELA DE AGENDAMENTO ====== -->
+  <main id="telaAgendamento" class="hidden">
+    <h2 id="boasVindas"></h2>
+
+    <!-- Calendário -->
+    <div class="calendar">
+      <div class="calendar-header">
+        <button onclick="mudarMes(-1)">&lt;</button>
+        <span id="mesAno"></span>
+        <button onclick="mudarMes(1)">&gt;</button>
+      </div>
+      <div id="diasCalendario" class="calendar-grid"></div>
+    </div>
+
+    <!-- Lista de horários -->
+    <div id="areaHorarios" class="hidden">
+      <h3>Horários</h3>
+      <div id="listaHorarios" class="horarios"></div>
+    </div>
+
+    <!-- Lista de salas -->
+    <div id="areaSalas" class="hidden">
+      <h3>Salas</h3>
+      <div id="listaSalas" class="salas"></div>
+    </div>
+
+    <button class="btn" onclick="mostrarAgendamentos()">Meus Agendamentos</button>
+    <button class="btn" onclick="logout()">Sair</button>
+  </main>
+
+  <!-- ====== TELA DE AGENDAMENTOS ====== -->
+  <main id="telaVerAgendamentos" class="hidden">
+    <h2>Meus Agendamentos</h2>
+    <ul id="listaAgendamentos" class="listaAgendamentos"></ul>
+    <button class="btn" onclick="mostrar('telaAgendamento')">Voltar</button>
+  </main>
+
+<script>
+  /* ====== CONFIGURAÇÕES INICIAIS ====== */
+  const salas = ["Laboratório de Informática","Laboratório de Ciências","Sala de Vídeo","Auditório"];
+  let usuario=null;
+  let dataSelecionada=null;
+  let horaSelecionada=null;
+
+  /* ====== MOSTRAR / ESCONDER SENHA ====== */
+  function toggleSenha(id, el){
+    const campo = document.getElementById(id);
+    if(campo.type === "password"){
+      campo.type = "text";
+      el.textContent = "🙈";
+    } else {
+      campo.type = "password";
+      el.textContent = "👁";
+    }
+  }
+
+  /* ====== NAVEGAÇÃO ENTRE TELAS ====== */
+  function mostrar(id){
+    document.querySelectorAll("main").forEach(m=>m.classList.add("hidden"));
+    document.getElementById(id).classList.remove("hidden");
+  }
+
+  /* ====== CADASTRO ====== */
+  function iniciarCadastro(){
+    const nome=novoNome.value.trim();
+    const email=novoEmail.value.trim();
+    const senha=novaSenha.value;
+    const conf=confirmaSenha.value;
+    if(!nome||!email||!senha) return alert("Preencha todos os campos!");
+    if(senha!==conf) return alert("Senhas não coincidem!");
+
+    // Cria ID sequencial
+    let ultimoId = parseInt(localStorage.getItem("ultimoIdProf") || "0");
+    let id = ultimoId + 1;
+    localStorage.setItem("prof_"+id, JSON.stringify({nome,email,senha}));
+    localStorage.setItem("ultimoIdProf", id);
+
+    alert("Cadastro concluído! Seu ID é: "+id);
+    mostrar("telaInicial");
+  }
+
+  /* ====== LOGIN ====== */
+  function entrar(){
+    const id=loginNumero.value.trim();
+    const senha=loginSenha.value.trim();
+    const prof=JSON.parse(localStorage.getItem("prof_"+id));
+    if(!prof) return alert("Usuário não encontrado");
+    if(prof.senha!==senha) return alert("Senha incorreta");
+
+    usuario={id,nome:prof.nome};
+    document.getElementById("boasVindas").innerText="Bem-vindo, "+prof.nome;
+    mostrar("telaAgendamento");
+    montarCalendario();
+  }
+  function logout(){ usuario=null; mostrar("telaInicial"); }
+
+  /* ====== CALENDÁRIO ====== */
+  let mesAtual=(new Date()).getMonth();
+  let anoAtual=(new Date()).getFullYear();
+
+  function montarCalendario(){
+    const diasDiv=document.getElementById("diasCalendario");
+    diasDiv.innerHTML="";
+    const primeiroDia=new Date(anoAtual,mesAtual,1).getDay();
+    const ultimoDia=new Date(anoAtual,mesAtual+1,0).getDate();
+    const hoje=new Date();
+
+    document.getElementById("mesAno").innerText=
+      new Date(anoAtual,mesAtual).toLocaleString("pt-BR",{month:"long",year:"numeric"});
+
+    for(let i=0;i<primeiroDia;i++) diasDiv.innerHTML+="<div class='disabled'></div>";
+
+    for(let d=1;d<=ultimoDia;d++){
+      const div=document.createElement("div");
+      div.innerText=d;
+      const dataLoop=new Date(anoAtual,mesAtual,d);
+
+      // Desativa dias passados
+      if(dataLoop < new Date(hoje.getFullYear(),hoje.getMonth(),hoje.getDate())){
+        div.classList.add("disabled");
+      } else {
+        div.onclick=()=>selecionarData(d);
+      }
+
+      if(dataSelecionada&&dataSelecionada.dia===d&&dataSelecionada.mes===mesAtual&&dataSelecionada.ano===anoAtual){
+        div.classList.add("active");
+      }
+      diasDiv.appendChild(div);
+    }
+  }
+  function mudarMes(delta){
+    mesAtual+=delta;
+    if(mesAtual<0){mesAtual=11;anoAtual--;}
+    if(mesAtual>11){mesAtual=0;anoAtual++;}
+    montarCalendario();
+  }
+  function selecionarData(dia){
+    dataSelecionada={dia,mes:mesAtual,ano:anoAtual};
+    horaSelecionada=null;
+    montarCalendario();
+    mostrarHorarios();
+  }
+
+  /* ====== HORÁRIOS ====== */
+  function gerarHorarios(){
+    return ["07:00","07:50","08:40","09:30","10:40",
+            "13:00","13:50","14:40","15:30","16:40",
+            "19:00","19:50","20:40","21:30"];
+  }
+  function mostrarHorarios(){
+    document.getElementById("areaHorarios").classList.remove("hidden");
+    const div=document.getElementById("listaHorarios");
+    div.innerHTML="";
+    gerarHorarios().forEach(h=>{
+      const d=document.createElement("div");
+      d.className="horario";
+      d.innerText=h;
+      d.onclick=()=>{ horaSelecionada=h; mostrarSalas(); };
+      div.appendChild(d);
+    });
+  }
+
+  /* ====== SALAS ====== */
+  function mostrarSalas(){
+    document.getElementById("areaSalas").classList.remove("hidden");
+    const div=document.getElementById("listaSalas");
+    div.innerHTML="";
+    salas.forEach(s=>{
+      const chave="ag_"+dataSelecionada.dia+"_"+dataSelecionada.mes+"_"+dataSelecionada.ano+"_"+horaSelecionada;
+      const ag=JSON.parse(localStorage.getItem(chave)||"{}");
+      const el=document.createElement("div");
+      el.className="sala";
+
+      if(ag[s]){
+        el.classList.add("ocupada");
+        el.innerHTML=s+" - Agendado por "+ag[s].nome;
+
+        // Botão cancelar se for o dono
+        if(ag[s].id==usuario.id){
+          const btn=document.createElement("span");
+          btn.textContent="Cancelar";
+          btn.className="cancelar";
+          btn.onclick=()=>cancelarAgendamento({dia:dataSelecionada.dia,mes:dataSelecionada.mes,ano:dataSelecionada.ano,hora:horaSelecionada,sala:s});
+          el.appendChild(btn);
+        }
+      } else {
+        el.innerText=s+" (Disponível)";
+        el.onclick=()=>agendar(chave,s);
+      }
+      div.appendChild(el);
+    });
+  }
+  function agendar(chave,sala){
+    const ag=JSON.parse(localStorage.getItem(chave)||"{}");
+    if(ag[sala]) return alert("Já ocupado!");
+    ag[sala]={id:usuario.id,nome:usuario.nome};
+    localStorage.setItem(chave,JSON.stringify(ag));
+    mostrarSalas();
+  }
+  function cancelarAgendamento(ag){
+    const chave=`ag_${ag.dia}_${ag.mes}_${ag.ano}_${ag.hora}`;
+    const dados=JSON.parse(localStorage.getItem(chave));
+    delete dados[ag.sala];
+    localStorage.setItem(chave,JSON.stringify(dados));
+
+    if(document.getElementById("telaVerAgendamentos").classList.contains("hidden")){
+      mostrarSalas();
+    } else {
+      mostrar
